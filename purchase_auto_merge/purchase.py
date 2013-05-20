@@ -48,7 +48,7 @@ class purchase_order(osv.osv):
         po_ids = self.search(cr, uid, domain, context=context)
         return po_ids and po_ids[0] or False
 
-    def create_update_purchase_order(self, cr, uid, po_vals, context=None):
+    def create(self, cr, uid, po_vals, context=None):
         purchase_obj = self.pool.get('purchase.order')
         purchase_id = purchase_obj._get_existing_purchase_order(cr, uid, po_vals, context=context)
         if purchase_id:
@@ -57,7 +57,7 @@ class purchase_order(osv.osv):
                 po_vals['origin'] = (po_vals['origin'] or '') + ' ' + purchase.origin
             purchase.write(po_vals, context=context)
         else:
-            purchase_id = purchase_obj.create(cr, uid, po_vals, context=context)
+            purchase_id = super(purchase_order, self).create(cr, uid, po_vals, context=context)
         return purchase_id
 
     def unlock(self, cr, uid, ids, context=None):
@@ -67,7 +67,6 @@ class purchase_order(osv.osv):
         if vals.get('order_line') and not (context.get('update_from_procurement') or vals.get('lock') == False):
             for po in self.browse(cr, uid, ids, context=context):
                 if po.lock == True:
-                    import pdb; pdb.set_trace()
                     raise osv.except_osv(_('User Error'), _('You can not change the locked purchase order %s. Unlock it before changing data'%po.name))
         return super(purchase_order, self).write(cr, uid, ids, vals, context=context)
 
@@ -77,6 +76,5 @@ class procurement_order(osv.osv):
     def _prepare_purchase_order(self, cr, uid, procurement, seller_info, purchase_date, context=None):
         vals = super(procurement_order, self)._prepare_purchase_order(cr, uid, procurement, seller_info, purchase_date, context=context)
         vals['lock'] = True
-        print 'vals====>',vals
         return vals
 
