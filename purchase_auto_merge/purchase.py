@@ -78,3 +78,26 @@ class procurement_order(osv.osv):
         vals['lock'] = True
         return vals
 
+    def write(self, cr, uid, ids, vals, context=None):
+        uom_obj = self.pool.get('product.uom')
+
+        if 'product_qty' in vals:
+            if not hasattr(ids, '__iter__'):
+                proc_ids = [ids]
+            else:
+                proc_ids = ids 
+    
+            for procurement in self.browse(cr, uid, proc_ids, context=context):
+                procurement.move_id.write({'product_qty': vals['product_qty']}, context=context)
+                qty = uom_obj._compute_qty(cr, uid, procurement.product_uom.id, 
+                                vals['product_qty'], procurement.purchase_line_id.product_uom.id)
+                procurement.purchase_line_id.write({'product_qty': qty}, context=context)
+                if procurement.purchase_line_id.order_id.lock == False:
+                    raise osv.except_osv(_('User Error'),
+                        _('The procurement %s is linked to the purchase order %s'
+                          ' and this Purchase Order is not Unlock. You can only '
+                          'update locked purchase order'
+                          %(procurement.name, procurement.purchase_line_id.order_id.name)))
+    
+        return super(procurement_order, self).write(cr, uid, ids, vals, context=context)
+
