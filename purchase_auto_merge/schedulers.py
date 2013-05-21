@@ -24,6 +24,16 @@ from osv import osv
 class procurement_order(osv.osv):
     _inherit = 'procurement.order'
 
+    def _check_if_create_new_procurement(self, cr, uid, orderpoint, context=None):
+        """Check if a new procurement have to be created
+            :param browse_record orderpoint: the orderpoint to check
+            :rtype: boolean
+            :return: True if a new procurement have to be created
+        """
+        result = super(procurement_order, self)._check_if_create_new_procurement(cr, uid, orderpoint, context=context)
+        return not (orderpoint.procurement_id.purchase_line_id 
+            and orderpoint.procurement_id.purchase_line_id.order_id.lock) or result
+
     def _update_procurement(self, cr, uid, op, context=None):
         """This method may be overridden to implement custom
             procurement generation. By default OpenERP do not
