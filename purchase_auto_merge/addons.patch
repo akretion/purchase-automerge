@@ -1,0 +1,423 @@
+=== modified file 'procurement/schedulers.py'
+--- procurement/schedulers.py	2012-03-16 13:40:52 +0000
++++ procurement/schedulers.py	2012-08-02 13:52:36 +0000
+@@ -216,6 +216,82 @@
+                 'procure_method': 'make_to_order',
+                 'origin': orderpoint.name}
+ 
++
++    def _get_qty_to_procure(self, cr, uid, op, context=None):
++        """
++        Return the qty of product to procure
++
++        :param browse_record op: the orderpoint object take care it's not an id this is used
++                                    in order to don't make a browse request for each orderpoint
++        :param float prods: The virtual product quantity in the stock
++        :rtype: float
++        :return: a quantity
++        """
++        location_obj = self.pool.get('stock.location')
++        wf_service = netsvc.LocalService("workflow")
++        
++        prods = location_obj._product_virtual_get(cr, uid,
++                op.location_id.id, [op.product_id.id],
++                {'uom': op.product_uom.id})[op.product_id.id]
++        
++        if prods >= op.product_min_qty:
++            return 0
++        else:
++            qty = max(op.product_min_qty, op.product_max_qty)-prods
++
++            reste = qty % op.qty_multiple
++            if reste > 0:
++                qty += op.qty_multiple - reste
++
++            if qty <= 0:
++                return 0
++            if op.product_id.type not in ('consu'):
++                if op.procurement_draft_ids:
++                # Check draft procurement related to this order point
++                    pro_ids = [x.id for x in op.procurement_draft_ids]
++                    procure_datas = self.read(
++                        cr, uid, pro_ids, ['product_qty'], context=context)
++                    to_generate = qty
++                    for proc_data in procure_datas:
++                        if to_generate >= proc_data['product_qty']:
++                            wf_service.trg_validate(uid, 'procurement.order', proc_data['id'], 'button_confirm', cr)
++                            self.write(cr, uid, [proc_data['id']],  {'origin': op.name}, context=context)
++                            to_generate -= proc_data['product_qty']
++                        if not to_generate:
++                            break
++                    qty = to_generate
++            return qty
++
++    def _check_if_create_new_procurement(self, cr, uid, orderpoint, context=None):
++        """Check if a new procurement have to be created
++            :param browse_record orderpoint: the orderpoint to check
++            :rtype: boolean
++            :return: True if a new procurement have to be created
++        """
++        return not (orderpoint.procurement_id.state != 'exception'\
++                    and orderpoint.procurement_id.purchase_line_id\
++                    and orderpoint.procurement_id.purchase_line_id.order_id.state in ('draft', 'confirmed'))
++
++    def _process_one_procurement(self, cr, uid, op, context=None):
++        """This method may be overridden to implement custom
++            procurement generation. By default OpenERP do not
++            update procurement.
++        """
++        if self._check_if_create_new_procurement(cr, uid, op, context=context):
++            wf_service = netsvc.LocalService("workflow")
++            qty = self. _get_qty_to_procure(cr, uid, op, context=context)
++            
++            if qty:
++                proc_id = self.create(cr, uid,
++                                 self._prepare_orderpoint_procurement(cr, uid, op, qty, context=context),
++                                 context=context)
++                wf_service.trg_validate(uid, 'procurement.order', proc_id,
++                        'button_confirm', cr)
++                wf_service.trg_validate(uid, 'procurement.order', proc_id,
++                        'button_check', cr)
++                op.write({'procurement_id': proc_id}, context=context)
++        return True
++
+     def _procure_orderpoint_confirm(self, cr, uid, automatic=False,\
+             use_new_cursor=False, context=None, user_id=False):
+         '''
+@@ -235,10 +311,8 @@
+         if use_new_cursor:
+             cr = pooler.get_db(use_new_cursor).cursor()
+         orderpoint_obj = self.pool.get('stock.warehouse.orderpoint')
+-        location_obj = self.pool.get('stock.location')
+-        procurement_obj = self.pool.get('procurement.order')
+         request_obj = self.pool.get('res.request')
+-        wf_service = netsvc.LocalService("workflow")
++
+         report = []
+         offset = 0
+         ids = [1]
+@@ -247,48 +321,7 @@
+         while ids:
+             ids = orderpoint_obj.search(cr, uid, [], offset=offset, limit=100)
+             for op in orderpoint_obj.browse(cr, uid, ids, context=context):
+-                if op.procurement_id.state != 'exception':
+-                    if op.procurement_id and op.procurement_id.purchase_id and op.procurement_id.purchase_id.state in ('draft', 'confirmed'):
+-                        continue
+-                prods = location_obj._product_virtual_get(cr, uid,
+-                        op.location_id.id, [op.product_id.id],
+-                        {'uom': op.product_uom.id})[op.product_id.id]
+-
+-                if prods < op.product_min_qty:
+-                    qty = max(op.product_min_qty, op.product_max_qty)-prods
+-
+-                    reste = qty % op.qty_multiple
+-                    if reste > 0:
+-                        qty += op.qty_multiple - reste
+-
+-                    if qty <= 0:
+-                        continue
+-                    if op.product_id.type not in ('consu'):
+-                        if op.procurement_draft_ids:
+-                        # Check draft procurement related to this order point
+-                            pro_ids = [x.id for x in op.procurement_draft_ids]
+-                            procure_datas = procurement_obj.read(
+-                                cr, uid, pro_ids, ['id', 'product_qty'], context=context)
+-                            to_generate = qty
+-                            for proc_data in procure_datas:
+-                                if to_generate >= proc_data['product_qty']:
+-                                    wf_service.trg_validate(uid, 'procurement.order', proc_data['id'], 'button_confirm', cr)
+-                                    procurement_obj.write(cr, uid, [proc_data['id']],  {'origin': op.name}, context=context)
+-                                    to_generate -= proc_data['product_qty']
+-                                if not to_generate:
+-                                    break
+-                            qty = to_generate
+-
+-                    if qty:
+-                        proc_id = procurement_obj.create(cr, uid,
+-                                                         self._prepare_orderpoint_procurement(cr, uid, op, qty, context=context),
+-                                                         context=context)
+-                        wf_service.trg_validate(uid, 'procurement.order', proc_id,
+-                                'button_confirm', cr)
+-                        wf_service.trg_validate(uid, 'procurement.order', proc_id,
+-                                'button_check', cr)
+-                        orderpoint_obj.write(cr, uid, [op.id],
+-                                {'procurement_id': proc_id}, context=context)
++                self._process_one_procurement(cr, uid, op, context=context)
+             offset += len(ids)
+             if use_new_cursor:
+                 cr.commit()
+@@ -304,6 +337,4 @@
+             cr.close()
+         return {}
+ 
+-procurement_order()
+-
+ # vim:expandtab:smartindent:tabstop=4:softtabstop=4:shiftwidth=4:
+
+=== modified file 'purchase/purchase.py'
+--- purchase/purchase.py	2012-07-25 17:07:19 +0000
++++ purchase/purchase.py	2012-08-02 13:52:36 +0000
+@@ -814,7 +814,7 @@
+ class procurement_order(osv.osv):
+     _inherit = 'procurement.order'
+     _columns = {
+-        'purchase_id': fields.many2one('purchase.order', 'Purchase Order'),
++        'purchase_line_id': fields.many2one('purchase.order.line', 'Purchase Order Line', readonly=True),
+     }
+ 
+     def action_po_assign(self, cr, uid, ids, context=None):
+@@ -825,24 +825,7 @@
+         res = res.values()
+         return len(res) and res[0] or 0 #TO CHECK: why workflow is generated error if return not integer value
+ 
+-    def create_procurement_purchase_order(self, cr, uid, procurement, po_vals, line_vals, context=None):
+-        """Create the purchase order from the procurement, using
+-           the provided field values, after adding the given purchase
+-           order line in the purchase order.
+-
+-           :params procurement: the procurement object generating the purchase order
+-           :params dict po_vals: field values for the new purchase order (the
+-                                 ``order_line`` field will be overwritten with one
+-                                 single line, as passed in ``line_vals``).
+-           :params dict line_vals: field values of the single purchase order line that
+-                                   the purchase order will contain.
+-           :return: id of the newly created purchase order
+-           :rtype: int
+-        """
+-        po_vals.update({'order_line': [(0,0,line_vals)]})
+-        return self.pool.get('purchase.order').create(cr, uid, po_vals, context=context)
+-
+-    def _get_purchase_schedule_date(self, cr, uid, procurement, company, context=None):
++    def _get_purchase_schedule_date(self, cr, uid, procurement, context=None):
+         """Return the datetime value to use as Schedule Date (``date_planned``) for the
+            Purchase Order Lines created to satisfy the given procurement.
+ 
+@@ -852,10 +835,10 @@
+            :return: the desired Schedule Date for the PO lines
+         """
+         procurement_date_planned = datetime.strptime(procurement.date_planned, DEFAULT_SERVER_DATETIME_FORMAT)
+-        schedule_date = (procurement_date_planned - relativedelta(days=company.po_lead))
++        schedule_date = (procurement_date_planned - relativedelta(days=procurement.company_id.po_lead))
+         return schedule_date
+ 
+-    def _get_purchase_order_date(self, cr, uid, procurement, company, schedule_date, context=None):
++    def _get_purchase_order_date(self, cr, uid, procurement, schedule_date, context=None):
+         """Return the datetime value to use as Order Date (``date_order``) for the
+            Purchase Order created to satisfy the given procurement.
+ 
+@@ -868,6 +851,98 @@
+         seller_delay = int(procurement.product_id.seller_delay)
+         return schedule_date - relativedelta(days=seller_delay)
+ 
++    def _prepare_purchase_order(self, cr, uid, procurement, seller_info, purchase_date, context=None):
++        """Prepare the dict of values to create the new purchase order for a
++           procurement. This method may be overridden to implement custom
++           purchase generation (making sure to call super() to establish
++           a clean extension chain).
++
++           :param browse_record order: procurement record to purchase
++           :params dict seller_info: dict of information about the seller
++           :param datetime purchase_date: planned purchase date
++           :rtype: dict
++           :return: dict of value to create() the purchase order
++        """
++        seq_obj = self.pool.get('ir.sequence')
++        warehouse_obj = self.pool.get('stock.warehouse')
++        partner = seller_info["partner"]
++        pricelist = seller_info["pricelist"]
++        name = seq_obj.get(cr, uid, 'purchase.order') or _('PO: %s') % procurement.name
++        warehouse_id = warehouse_obj.search(cr, uid, [('company_id', '=', procurement.company_id.id)], context=context)
++
++        return {
++            'name': name,
++            'origin': procurement.origin,
++            'partner_id': partner.id,
++            'partner_address_id': partner.address_get(['delivery'])['delivery'],
++            'location_id': procurement.location_id.id,
++            'warehouse_id': warehouse_id and warehouse_id[0] or False,
++            'pricelist_id': pricelist.id,
++            'date_order': purchase_date.strftime(DEFAULT_SERVER_DATETIME_FORMAT),
++            'company_id': procurement.company_id.id,
++            'fiscal_position': partner.property_account_position and partner.property_account_position.id or False
++        }
++        
++        
++    def _prepare_purchase_order_line(self, cr, uid, procurement, purchase_id, seller_info, schedule_date, context=None):
++        """Prepare the dict of values to create the new purchase order line for a
++           procurement. This method may be overridden to implement custom
++           purchase line generation (making sure to call super() to establish
++           a clean extension chain).
++
++           :param browse_record order: procurement record to purchase
++           :param int purchase_id: purchase id linked to the new purchase line
++           :param dict seller_info: dict of information about the seller
++           :param datetime schedule_date: planned purchase date
++           :rtype: dict
++           :return: dict of value to create() the purchase order line
++        """
++        prod_obj = self.pool.get('product.product')
++        acc_pos_obj = self.pool.get('account.fiscal.position')
++        uom_obj = self.pool.get('product.uom')
++        pricelist = seller_info["pricelist"]
++        partner = seller_info["partner"]
++        seller_qty = seller_info["seller_qty"]
++        uom = procurement.product_id.uom_po_id
++        qty = uom_obj._compute_qty(cr, uid, procurement.product_uom.id, procurement.product_qty, uom.id)
++        if seller_qty:
++            qty = max(qty,seller_qty)
++        price = pricelist.price_get(procurement.product_id.id, qty, partner.id, {'uom': uom.id})[pricelist.id]
++        
++        #Passing partner_id to context for purchase order line integrity of Line name
++        context.update({'lang': partner.lang, 'partner_id': partner.id})
++        product = prod_obj.browse(cr, uid, procurement.product_id.id, context=context)
++        taxes_ids = procurement.product_id.supplier_taxes_id
++        taxes = acc_pos_obj.map_tax(cr, uid, partner.property_account_position, taxes_ids)
++
++        return {
++            'name': product.partner_ref,
++            'product_qty': qty,
++            'product_id': procurement.product_id.id,
++            'product_uom': uom.id,
++            'price_unit': price or 0.0,
++            'date_planned': schedule_date.strftime(DEFAULT_SERVER_DATETIME_FORMAT),
++            'move_dest_id': procurement.move_id.id,
++            'notes': product.description_purchase,
++            'taxes_id': [(6,0,taxes)],
++            'order_id': purchase_id,
++        }
++
++    def _get_seller_info(self, cr, uid, procurement, context=None):
++        """Get the seller information link partner, seller_qty and pricelist
++            This method may be overridden to implement custom
++            purchase order generation (making sure to call super() to establish
++            a clean extension chain).
++
++           :param browse_record order: procurement record to purchase
++           :rtype: dict
++           :return: dict of value to create() the purchase order line
++        """
++        return {
++            "partner": procurement.product_id.seller_id, # Taken Main Supplier of Product of Procurement.
++            "seller_qty": procurement.product_id.seller_qty,
++            "pricelist": procurement.product_id.seller_id.property_product_pricelist_purchase,
++            }
++
+     def make_po(self, cr, uid, ids, context=None):
+         """ Make purchase order from procurement
+         @return: New created Purchase Orders procurement wise
+@@ -875,66 +950,19 @@
+         res = {}
+         if context is None:
+             context = {}
+-        company = self.pool.get('res.users').browse(cr, uid, uid, context=context).company_id
+-        partner_obj = self.pool.get('res.partner')
+-        uom_obj = self.pool.get('product.uom')
+-        pricelist_obj = self.pool.get('product.pricelist')
+-        prod_obj = self.pool.get('product.product')
+-        acc_pos_obj = self.pool.get('account.fiscal.position')
+-        seq_obj = self.pool.get('ir.sequence')
+-        warehouse_obj = self.pool.get('stock.warehouse')
++        purchase_obj = self.pool.get('purchase.order')
++        purchase_line_obj = self.pool.get('purchase.order.line')
+         for procurement in self.browse(cr, uid, ids, context=context):
+-            res_id = procurement.move_id.id
+-            partner = procurement.product_id.seller_id # Taken Main Supplier of Product of Procurement.
+-            seller_qty = procurement.product_id.seller_qty
+-            partner_id = partner.id
+-            address_id = partner_obj.address_get(cr, uid, [partner_id], ['delivery'])['delivery']
+-            pricelist_id = partner.property_product_pricelist_purchase.id
+-            warehouse_id = warehouse_obj.search(cr, uid, [('company_id', '=', procurement.company_id.id or company.id)], context=context)
+-            uom_id = procurement.product_id.uom_po_id.id
+-
+-            qty = uom_obj._compute_qty(cr, uid, procurement.product_uom.id, procurement.product_qty, uom_id)
+-            if seller_qty:
+-                qty = max(qty,seller_qty)
+-
+-            price = pricelist_obj.price_get(cr, uid, [pricelist_id], procurement.product_id.id, qty, partner_id, {'uom': uom_id})[pricelist_id]
+-
+-            schedule_date = self._get_purchase_schedule_date(cr, uid, procurement, company, context=context)
+-            purchase_date = self._get_purchase_order_date(cr, uid, procurement, company, schedule_date, context=context)
+-
+-            #Passing partner_id to context for purchase order line integrity of Line name
+-            context.update({'lang': partner.lang, 'partner_id': partner_id})
+-
+-            product = prod_obj.browse(cr, uid, procurement.product_id.id, context=context)
+-            taxes_ids = procurement.product_id.product_tmpl_id.supplier_taxes_id
+-            taxes = acc_pos_obj.map_tax(cr, uid, partner.property_account_position, taxes_ids)
+-
+-            line_vals = {
+-                'name': product.partner_ref,
+-                'product_qty': qty,
+-                'product_id': procurement.product_id.id,
+-                'product_uom': uom_id,
+-                'price_unit': price or 0.0,
+-                'date_planned': schedule_date.strftime(DEFAULT_SERVER_DATETIME_FORMAT),
+-                'move_dest_id': res_id,
+-                'notes': product.description_purchase,
+-                'taxes_id': [(6,0,taxes)],
+-            }
+-            name = seq_obj.get(cr, uid, 'purchase.order') or _('PO: %s') % procurement.name
+-            po_vals = {
+-                'name': name,
+-                'origin': procurement.origin,
+-                'partner_id': partner_id,
+-                'partner_address_id': address_id,
+-                'location_id': procurement.location_id.id,
+-                'warehouse_id': warehouse_id and warehouse_id[0] or False,
+-                'pricelist_id': pricelist_id,
+-                'date_order': purchase_date.strftime(DEFAULT_SERVER_DATETIME_FORMAT),
+-                'company_id': procurement.company_id.id,
+-                'fiscal_position': partner.property_account_position and partner.property_account_position.id or False
+-            }
+-            res[procurement.id] = self.create_procurement_purchase_order(cr, uid, procurement, po_vals, line_vals, context=context)
+-            self.write(cr, uid, [procurement.id], {'state': 'running', 'purchase_id': res[procurement.id]})
++            seller_info = self._get_seller_info(cr, uid, procurement, context=context)
++            schedule_date = self._get_purchase_schedule_date(cr, uid, procurement, context=context)
++            purchase_date = self._get_purchase_order_date(cr, uid, procurement, schedule_date, context=context)
++            po_vals = self._prepare_purchase_order(cr, uid, procurement, seller_info, purchase_date, context=context)
++            purchase_id = purchase_obj.create(cr, uid, po_vals, context=context)
++            po_line_id = purchase_line_obj.create(cr, uid, 
++                        self._prepare_purchase_order_line(cr, uid, procurement, purchase_id, seller_info, schedule_date, context=context),
++                        context=context)
++            self.write(cr, uid, [procurement.id], {'state': 'running', 'purchase_line_id': po_line_id})
++            res[procurement.id] = purchase_id
+         return res
+ 
+ procurement_order()
+
+=== modified file 'purchase/purchase_view.xml'
+--- purchase/purchase_view.xml	2012-02-07 13:17:19 +0000
++++ purchase/purchase_view.xml	2012-08-02 13:52:36 +0000
+@@ -534,7 +534,7 @@
+             <field name="type">form</field>
+             <field name="arch" type="xml">
+                 <xpath expr="/form/notebook/page/field[@name='close_move']" position="before">
+-                    <field name="purchase_id"/>
++                    <field name="purchase_line_id"/>
+                 </xpath>
+             </field>
+         </record>
+
+=== modified file 'purchase/test/process/run_scheduler.yml'
+--- purchase/test/process/run_scheduler.yml	2011-11-14 21:33:19 +0000
++++ purchase/test/process/run_scheduler.yml	2012-08-02 13:52:36 +0000
+@@ -23,4 +23,4 @@
+ -
+   !python {model: procurement.order}: |
+     procurement = self.browse(cr, uid, ref('procurement_order_testcase0'))
+-    assert procurement.purchase_id, 'RFQ should be generated!'
++    assert procurement.purchase_line_id, 'RFQ should be generated!'
+
+=== modified file 'purchase_requisition/purchase_requisition.py'
+--- purchase_requisition/purchase_requisition.py	2011-12-23 11:22:41 +0000
++++ purchase_requisition/purchase_requisition.py	2012-08-02 13:52:36 +0000
+@@ -212,7 +212,7 @@
+             if po.requisition_id and (po.requisition_id.exclusive=='exclusive'):
+                 for order in po.requisition_id.purchase_ids:
+                     if order.id<>po.id:
+-                        proc_ids = proc_obj.search(cr, uid, [('purchase_id', '=', order.id)])
++                        proc_ids = proc_obj.search(cr, uid, [('purchase_line_id', 'in', [line.id for line in order.order_line])])
+                         if proc_ids and po.state=='confirmed':
+                             proc_obj.write(cr, uid, proc_ids, {'purchase_id': po.id})
+                         wf_service = netsvc.LocalService("workflow")
+

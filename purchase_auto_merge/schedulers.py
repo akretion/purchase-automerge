@@ -34,16 +34,20 @@ class procurement_order(osv.osv):
         return not (orderpoint.procurement_id.purchase_line_id 
             and orderpoint.procurement_id.purchase_line_id.order_id.lock) or result
 
-    def _update_procurement(self, cr, uid, op, context=None):
+    def _process_one_procurement(self, cr, uid, op, context=None):
         """This method may be overridden to implement custom
             procurement generation. By default OpenERP do not
             update procurement.
         """
-        if not context: context={}
-        qty = self. _get_qty_to_procure(cr, uid, op, context=context)
-        if qty:
-            total_qty = op.procurement_id.product_qty + qty
-            ctx = context.copy()
-            ctx['update_from_procurement'] = True
-            op.procurement_id.write({'product_qty' : total_qty}, context=ctx)
+        super(procurement_order, self)._process_one_procurement(cr, uid, op, context=context)
+        if not self._check_if_create_new_procurement(cr, uid, op, context=context):
+            if not context: context={}
+            qty = self. _get_qty_to_procure(cr, uid, op, context=context)
+            if qty:
+                total_qty = op.procurement_id.product_qty + qty
+                ctx = context.copy()
+                ctx['update_from_procurement'] = True
+                op.procurement_id.write({'product_qty' : total_qty}, context=ctx)
         return True
+
+

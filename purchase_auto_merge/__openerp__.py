@@ -34,8 +34,7 @@
     Also the purchase order are automatically merge per supplier.
 
     WARNING : you need to apply a patch on your addons.
-    Please merge this branch in your addons
-    https://code.launchpad.net/~akretion-team/openobject-addons/openobject-addons-purchase-61
+    The path is provide in the module it's name is "addons.patch"
     """,
     'author': 'Akretion',
     'website': 'http://www.akretion.com/',
