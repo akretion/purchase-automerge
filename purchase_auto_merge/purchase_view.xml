@@ -17,50 +17,47 @@
             <field eval="16" name="priority"/>
             <field name="type">form</field>
             <field name="arch" type="xml">
-                <xpath expr="/form/notebook/page/group/field[@name='state']/.." position="attributes">
+                <xpath expr="/form/header/field[@name='state']/.." position="attributes">
                     <attribute name="attrs">{'invisible':[('lock','=',True)]}</attribute>
                 </xpath>
-                <xpath expr="/form/notebook/page/group/field[@name='state']/.." position="after">
+                <xpath expr="/form/header/field[@name='state']/.." position="after">
                     <field name="lock" invisible="1"/>
                     <label string="Automatic Purchase Order Waiting For Confirmation" attrs="{'invisible':[('lock','=', False)]}"/>
                     <button name="unlock" string="Convert to a draft purchase order" type="object" icon="gtk-convert" attrs="{'invisible':[('lock','=',False)]}"/>
                 </xpath>
 
-                <xpath expr="/form/group/field[@name='name']" position="attributes">
+                <xpath expr="//field[@name='name']" position="attributes">
                     <attribute name="attrs">{'readonly':[('lock','=',True)]}</attribute>
                 </xpath>
-                <xpath expr="/form/group/field[@name='date_order']" position="attributes">
+                <xpath expr="//field[@name='date_order']" position="attributes">
                     <attribute name="attrs">{'readonly':[('lock','=',True)]}</attribute>
                 </xpath>
-                <xpath expr="/form/group/field[@name='invoiced']" position="attributes">
+                <xpath expr="//field[@name='invoiced']" position="attributes">
                     <attribute name="attrs">{'readonly':[('lock','=',True)]}</attribute>
                 </xpath>
-                <xpath expr="/form/group/field[@name='warehouse_id']" position="attributes">
+                <xpath expr="//field[@name='warehouse_id']" position="attributes">
                     <attribute name="attrs">{'readonly':[('lock','=',True)]}</attribute>
                 </xpath>
-                <xpath expr="/form/group/field[@name='partner_ref']" position="attributes">
+                <xpath expr="//field[@name='partner_ref']" position="attributes">
                     <attribute name="attrs">{'readonly':[('lock','=',True)]}</attribute>
                 </xpath>
-                <xpath expr="/form/group/field[@name='shipped']" position="attributes">
+                <xpath expr="//field[@name='shipped']" position="attributes">
                     <attribute name="attrs">{'readonly':[('lock','=',True)]}</attribute>
                 </xpath>
-                <xpath expr="/form/group/field[@name='company_id']" position="attributes">
+                <xpath expr="//field[@name='company_id']" position="attributes">
                     <attribute name="attrs">{'readonly':[('lock','=',True)]}</attribute>
                 </xpath>
 
-                <xpath expr="/form/notebook/page/field[@name='order_line']" position="attributes">
+                <xpath expr="//field[@name='order_line']" position="attributes">
                     <attribute name="attrs">{'readonly':[('lock','=',True)]}</attribute>
                 </xpath>
-                <xpath expr="/form/notebook/page/field[@name='partner_id']" position="attributes">
+                <xpath expr="//field[@name='partner_id']" position="attributes">
                     <attribute name="attrs">{'readonly':[('lock','=',True)]}</attribute>
                 </xpath>
-                <xpath expr="/form/notebook/page/field[@name='partner_address_id']" position="attributes">
+                <xpath expr="//field[@name='pricelist_id']" position="attributes">
                     <attribute name="attrs">{'readonly':[('lock','=',True)]}</attribute>
                 </xpath>
-                <xpath expr="/form/notebook/page/field[@name='pricelist_id']" position="attributes">
-                    <attribute name="attrs">{'readonly':[('lock','=',True)]}</attribute>
-                </xpath>
-                <xpath expr="/form/notebook/page/field[@name='origin']" position="attributes">
+                <xpath expr="//field[@name='origin']" position="attributes">
                     <attribute name="attrs">{'readonly':[('lock','=',True)]}</attribute>
                 </xpath>
 

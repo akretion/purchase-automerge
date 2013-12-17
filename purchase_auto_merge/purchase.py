@@ -86,7 +86,6 @@ class procurement_order(osv.osv):
                 proc_ids = [ids]
             else:
                 proc_ids = ids 
-    
             for procurement in self.browse(cr, uid, proc_ids, context=context):
                 procurement.move_id.write({'product_qty': vals['product_qty']}, context=context)
                 qty = uom_obj._compute_qty(cr, uid, procurement.product_uom.id, 
@@ -98,6 +97,11 @@ class procurement_order(osv.osv):
                           ' and this Purchase Order is not Unlock. You can only '
                           'update locked purchase order'
                           %(procurement.name, procurement.purchase_line_id.order_id.name)))
-    
         return super(procurement_order, self).write(cr, uid, ids, vals, context=context)
 
+    def _product_virtual_get(self, cr, uid, order_point):
+
+        location_obj = self.pool.get('stock.location')
+        return location_obj._product_virtual_get(cr, uid,
+                order_point.location_id.id, [order_point.product_id.id],
+                {'uom': order_point.product_uom.id})[order_point.product_id.id]
