@@ -24,30 +24,32 @@ from osv import osv
 class procurement_order(osv.osv):
     _inherit = 'procurement.order'
 
-    def _check_if_create_new_procurement(self, cr, uid, orderpoint, context=None):
-        """Check if a new procurement have to be created
-            :param browse_record orderpoint: the orderpoint to check
+    def _check_existing_locked_purchase(self, cr, uid, op, context=None):
+        """Check if a locked purchase order has already been created 
+            :param browse_record op: the orderpoint to check
             :rtype: boolean
-            :return: True if a new procurement have to be created
+            :return: True if a purchase exists
         """
-        result = super(procurement_order, self)._check_if_create_new_procurement(cr, uid, orderpoint, context=context)
-        return not (orderpoint.procurement_id.purchase_line_id 
-            and orderpoint.procurement_id.purchase_line_id.order_id.lock) or result
+        return (op.procurement_id.purchase_line_id 
+            and op.procurement_id.purchase_line_id.order_id.lock)
 
-    def _process_one_procurement(self, cr, uid, op, context=None):
+    def _process_one_procurement(self, cr, uid, op, prods, context=None):
         """This method may be overridden to implement custom
             procurement generation. By default OpenERP do not
             update procurement.
         """
-        super(procurement_order, self)._process_one_procurement(cr, uid, op, context=context)
-        if not self._check_if_create_new_procurement(cr, uid, op, context=context):
-            if not context: context={}
-            qty = self. _get_qty_to_procure(cr, uid, op, context=context)
+        orderpoint_obj = self.pool['stock.warehouse.orderpoint']
+        if not context: context={}
+        if self._check_existing_locked_purchase(cr, uid, op, context=context):
+            qty = self._get_qty_to_procure(cr, uid, op, prods, context=context)
             if qty:
+                op = orderpoint_obj.browse(cr, uid, op.id, context=context)
                 total_qty = op.procurement_id.product_qty + qty
                 ctx = context.copy()
                 ctx['update_from_procurement'] = True
                 op.procurement_id.write({'product_qty' : total_qty}, context=ctx)
+        else:
+            super(procurement_order, self)._process_one_procurement(cr, uid, op, prods, context=context)
         return True
 
 
