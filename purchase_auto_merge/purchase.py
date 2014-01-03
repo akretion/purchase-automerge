@@ -57,12 +57,10 @@ class purchase_order(orm.Model):
         return po_ids and po_ids[0] or False
 
     def create(self, cr, uid, po_vals, context=None):
-        purchase_obj = self.pool['purchase.order']
-        purchase_id = purchase_obj._get_existing_purchase_order(
+        purchase_id = self._get_existing_purchase_order(
             cr, uid, po_vals, context=context)
         if purchase_id:
-            purchase = purchase_obj.browse(
-                cr, uid, purchase_id, context=context)
+            purchase = self.browse(cr, uid, purchase_id, context=context)
             if po_vals['origin'] and not po_vals['origin'] in purchase.origin:
                 po_vals['origin'] += ' %s' % purchase.origin
             purchase.write(po_vals, context=context)
@@ -86,6 +84,39 @@ class purchase_order(orm.Model):
                             "Unlock it before changing data.") % po.name)
         return super(purchase_order, self).write(
             cr, uid, ids, vals, context=context)
+
+
+class purchase_order_line(orm.Model):
+    _inherit = 'purchase.order.line'
+
+    def _get_po_line_matching_key(self, cr, uid, context=None):
+        return ['product_id', 'product_uom']
+
+    def _get_existing_purchase_order_line(
+            self, cr, uid, po_line_vals, context=None):
+        print "_get_existing_purchase_order_line po_line_vals=", po_line_vals
+        matching_key = self._get_po_line_matching_key(cr, uid, context=context)
+        domain = [('state', '=', 'draft')]
+        for key in matching_key:
+            domain.append((key, '=', po_line_vals.get(key)))
+        po_line_ids = self.search(cr, uid, domain, context=context)
+        return po_line_ids and po_line_ids[0] or False
+
+    def create(self, cr, uid, vals, context=None):
+        print "create vals=", vals
+        po_line_id = self._get_existing_purchase_order_line(
+            cr, uid, vals, context=context)
+        if po_line_id:
+            po_line = self.browse(
+                cr, uid, po_line_id, context=context)
+            added_qty = vals.get('product_qty')
+            if added_qty:
+                new_qty = po_line.product_qty + added_qty
+                po_line.write({'product_qty': new_qty}, context=context)
+        else:
+            po_line_id = super(purchase_order_line, self).create(
+                cr, uid, vals, context=context)
+        return po_line_id
 
 
 class procurement_order(orm.Model):
