@@ -1,66 +1,63 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  purchase_advanced for OpenERP
-  Copyright (C) 2012 Akretion Sébastien BEAU <sebastien.beau@akretion.com>
+  Copyright (C) 2012-2014 Akretion (http://www.akretion.com)
+  @author Sébastien BEAU <sebastien.beau@akretion.com>
   The licence is in the file __openerp__.py
 -->
 
 <openerp>
     <data>
-    
-        <!-- INHERITED VIEW FOR THE OBJECT : purchase -->
 
         <record id="purchase_order_form" model="ir.ui.view">
-            <field name="name">purchase_advanced.purchase.view_form</field>
+            <field name="name">purchase_auto_merge.purchase.view_form</field>
             <field name="model">purchase.order</field>
             <field name="inherit_id" ref="purchase.purchase_order_form" />
-            <field eval="16" name="priority"/>
-            <field name="type">form</field>
             <field name="arch" type="xml">
                 <xpath expr="/form/header/field[@name='state']/.." position="attributes">
-                    <attribute name="attrs">{'invisible':[('lock','=',True)]}</attribute>
+                    <attribute name="attrs">{'invisible': [('lock', '=', True)]}</attribute>
                 </xpath>
                 <xpath expr="/form/header/field[@name='state']/.." position="after">
                     <field name="lock" invisible="1"/>
-                    <label string="Automatic Purchase Order Waiting For Confirmation" attrs="{'invisible':[('lock','=', False)]}"/>
-                    <button name="unlock" string="Convert to a draft purchase order" type="object" icon="gtk-convert" attrs="{'invisible':[('lock','=',False)]}"/>
+                    <label string="Automatic Purchase Order Waiting For Confirmation"
+                            attrs="{'invisible': [('lock', '=', False)]}"/>
+                    <button name="unlock" string="Convert to a Draft Purchase Order"
+                            type="object" class="oe_highlight"
+                            attrs="{'invisible': [('lock', '=', False)]}"/>
                 </xpath>
 
                 <xpath expr="//field[@name='name']" position="attributes">
-                    <attribute name="attrs">{'readonly':[('lock','=',True)]}</attribute>
+                    <attribute name="attrs">{'readonly': [('lock', '=', True)]}</attribute>
                 </xpath>
                 <xpath expr="//field[@name='date_order']" position="attributes">
-                    <attribute name="attrs">{'readonly':[('lock','=',True)]}</attribute>
+                    <attribute name="attrs">{'readonly': [('lock', '=', True)]}</attribute>
                 </xpath>
                 <xpath expr="//field[@name='invoiced']" position="attributes">
-                    <attribute name="attrs">{'readonly':[('lock','=',True)]}</attribute>
+                    <attribute name="attrs">{'readonly': [('lock', '=', True)]}</attribute>
                 </xpath>
                 <xpath expr="//field[@name='warehouse_id']" position="attributes">
-                    <attribute name="attrs">{'readonly':[('lock','=',True)]}</attribute>
+                    <attribute name="attrs">{'readonly': [('lock', '=', True)]}</attribute>
                 </xpath>
                 <xpath expr="//field[@name='partner_ref']" position="attributes">
-                    <attribute name="attrs">{'readonly':[('lock','=',True)]}</attribute>
+                    <attribute name="attrs">{'readonly': [('lock', '=', True)]}</attribute>
                 </xpath>
                 <xpath expr="//field[@name='shipped']" position="attributes">
-                    <attribute name="attrs">{'readonly':[('lock','=',True)]}</attribute>
+                    <attribute name="attrs">{'readonly': [('lock', '=', True)]}</attribute>
                 </xpath>
                 <xpath expr="//field[@name='company_id']" position="attributes">
-                    <attribute name="attrs">{'readonly':[('lock','=',True)]}</attribute>
+                    <attribute name="attrs">{'readonly': [('lock', '=', True)]}</attribute>
                 </xpath>
-
                 <xpath expr="//field[@name='order_line']" position="attributes">
-                    <attribute name="attrs">{'readonly':[('lock','=',True)]}</attribute>
+                    <attribute name="attrs">{'readonly': [('lock', '=', True)]}</attribute>
                 </xpath>
                 <xpath expr="//field[@name='partner_id']" position="attributes">
-                    <attribute name="attrs">{'readonly':[('lock','=',True)]}</attribute>
+                    <attribute name="attrs">{'readonly': [('lock', '=', True)]}</attribute>
                 </xpath>
                 <xpath expr="//field[@name='pricelist_id']" position="attributes">
-                    <attribute name="attrs">{'readonly':[('lock','=',True)]}</attribute>
+                    <attribute name="attrs">{'readonly': [('lock', '=', True)]}</attribute>
                 </xpath>
                 <xpath expr="//field[@name='origin']" position="attributes">
-                    <attribute name="attrs">{'readonly':[('lock','=',True)]}</attribute>
+                    <attribute name="attrs">{'readonly': [('lock', '=', True)]}</attribute>
                 </xpath>
-
             </field>
         </record>
 
