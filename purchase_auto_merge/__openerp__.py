@@ -43,8 +43,9 @@ purchase order ;
 
 * otherwise, the procurement scheduler will create a new *lock* purchase order.
 
-WARNING : you need to apply a patch on your addons.
-The path is provide in the module it's name is "addons.patch"
+WARNING : you need to modify your addons to make this module work.
+In fact, you need to get the code of this merge proposal :
+https://code.launchpad.net/~akretion-team/openobject-addons/trunk-purchase-refactor/+merge/113618
     """,
     'author': 'Akretion',
     'website': 'http://www.akretion.com/',
