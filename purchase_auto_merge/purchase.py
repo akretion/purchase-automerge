@@ -94,7 +94,6 @@ class purchase_order_line(orm.Model):
 
     def _get_existing_purchase_order_line(
             self, cr, uid, po_line_vals, context=None):
-        print "_get_existing_purchase_order_line po_line_vals=", po_line_vals
         matching_key = self._get_po_line_matching_key(cr, uid, context=context)
         domain = [('state', '=', 'draft')]
         for key in matching_key:
@@ -103,7 +102,6 @@ class purchase_order_line(orm.Model):
         return po_line_ids and po_line_ids[0] or False
 
     def create(self, cr, uid, vals, context=None):
-        print "create vals=", vals
         po_line_id = self._get_existing_purchase_order_line(
             cr, uid, vals, context=context)
         if po_line_id:
@@ -138,22 +136,24 @@ class procurement_order(orm.Model):
             else:
                 proc_ids = ids
             for procurement in self.browse(cr, uid, proc_ids, context=context):
-                procurement.move_id.write(
-                    {'product_qty': vals['product_qty']}, context=context)
-                qty = uom_obj._compute_qty(
-                    cr, uid, procurement.product_uom.id,
-                    vals['product_qty'],
-                    procurement.purchase_line_id.product_uom.id)
-                procurement.purchase_line_id.write(
-                    {'product_qty': qty}, context=context)
-                if not procurement.purchase_line_id.order_id.lock:
-                    raise orm.except_orm(
-                        _('User Error'),
-                        _('The procurement %s is linked to the purchase order '
-                            '%s and this purchase order is not unlocked. '
-                            'You can only update locked purchase orders.')
-                        % (procurement.name,
-                            procurement.purchase_line_id.order_id.name))
+                if procurement.move_id and procurement.purchase_line_id:
+                    procurement.move_id.write(
+                        {'product_qty': vals['product_qty']}, context=context)
+                    qty = uom_obj._compute_qty(
+                        cr, uid, procurement.product_uom.id,
+                        vals['product_qty'],
+                        procurement.purchase_line_id.product_uom.id)
+                    procurement.purchase_line_id.write(
+                        {'product_qty': qty}, context=context)
+                    if not procurement.purchase_line_id.order_id.lock:
+                        raise orm.except_orm(
+                            _('User Error'),
+                            _('The procurement %s is linked to the purchase '
+                                'order %s and this purchase order is not '
+                                'unlocked. You can only update locked '
+                                'purchase orders.')
+                            % (procurement.name,
+                                procurement.purchase_line_id.order_id.name))
         return super(procurement_order, self).write(
             cr, uid, ids, vals, context=context)
 
