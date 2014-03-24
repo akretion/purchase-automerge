@@ -57,17 +57,19 @@ class purchase_order(orm.Model):
         return po_ids and po_ids[0] or False
 
     def create(self, cr, uid, po_vals, context=None):
-        purchase_id = self._get_existing_purchase_order(
-            cr, uid, po_vals, context=context)
-        if purchase_id:
-            purchase = self.browse(cr, uid, purchase_id, context=context)
-            if po_vals['origin'] and not po_vals['origin'] in purchase.origin:
-                po_vals['origin'] += ' %s' % purchase.origin
-            purchase.write(po_vals, context=context)
-        else:
-            purchase_id = super(purchase_order, self).create(
+        if context is None:
+            context = {}
+        if context.get('purchase_auto_merge'):
+            purchase_id = self._get_existing_purchase_order(
                 cr, uid, po_vals, context=context)
-        return purchase_id
+            if purchase_id:
+                purchase = self.browse(cr, uid, purchase_id, context=context)
+                if po_vals['origin'] and not po_vals['origin'] in purchase.origin:
+                    po_vals['origin'] += ' %s' % purchase.origin
+                purchase.write(po_vals, context=context)
+                return purchase_id
+        return super(purchase_order, self).create(
+            cr, uid, po_vals, context=context)
 
     def unlock(self, cr, uid, ids, context=None):
         return self.write(cr, uid, ids, {"lock": False}, context=context)
@@ -102,23 +104,30 @@ class purchase_order_line(orm.Model):
         return po_line_ids and po_line_ids[0] or False
 
     def create(self, cr, uid, vals, context=None):
-        po_line_id = self._get_existing_purchase_order_line(
-            cr, uid, vals, context=context)
-        if po_line_id:
-            po_line = self.browse(
-                cr, uid, po_line_id, context=context)
-            added_qty = vals.get('product_qty')
-            if added_qty:
-                new_qty = po_line.product_qty + added_qty
-                po_line.write({'product_qty': new_qty}, context=context)
-        else:
-            po_line_id = super(purchase_order_line, self).create(
+        if context.get('purchase_auto_merge'):
+            po_line_id = self._get_existing_purchase_order_line(
                 cr, uid, vals, context=context)
-        return po_line_id
+            if po_line_id:
+                po_line = self.browse(
+                    cr, uid, po_line_id, context=context)
+                added_qty = vals.get('product_qty')
+                if added_qty:
+                    new_qty = po_line.product_qty + added_qty
+                    po_line.write({'product_qty': new_qty}, context=context)
+                return po_line_id
+        return super(purchase_order_line, self).create(
+            cr, uid, vals, context=context)
 
 
 class procurement_order(orm.Model):
     _inherit = 'procurement.order'
+
+    def make_po(self, cr, uid, ids, context=None):
+        if context is None:
+            context = {}
+        context['purchase_auto_merge'] = True
+        return super(procurement_order, self).make_po(
+            cr, uid, ids, context=context)
 
     def _prepare_purchase_order(
             self, cr, uid, procurement, seller_info, purchase_date,
