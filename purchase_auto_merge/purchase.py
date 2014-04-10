@@ -20,24 +20,11 @@
 #
 ###############################################################################
 
-from openerp.osv import orm, fields
-from openerp.tools.translate import _
+from openerp.osv import orm
 
 
 class purchase_order(orm.Model):
     _inherit = "purchase.order"
-
-    _columns = {
-        'lock': fields.boolean(
-            'Lock', readonly=True,
-            help="An order generated automatically is locked by default "
-            "and you can not edit it until you unlock it. "
-            "An unlocked order is not updated automatically anymore."),
-    }
-
-    _defaults = {
-        'lock': False,
-    }
 
     def _get_po_matching_key(self, cr, uid, context=None):
         return [
@@ -45,14 +32,13 @@ class purchase_order(orm.Model):
             'location_id',
             'pricelist_id',
             'dest_address_id',
-            'lock',
-            ]
+        ]
 
     def _get_existing_purchase_order(self, cr, uid, po_vals, context=None):
         matching_key = self._get_po_matching_key(cr, uid, context=context)
         domain = [('state', '=', 'draft')]
         for key in matching_key:
-            domain.append((key, '=', po_vals.get(key)))
+            domain.append((key, '=', po_vals.get(key) or False))
         po_ids = self.search(cr, uid, domain, context=context)
         return po_ids and po_ids[0] or False
 
@@ -64,28 +50,13 @@ class purchase_order(orm.Model):
                 cr, uid, po_vals, context=context)
             if purchase_id:
                 purchase = self.browse(cr, uid, purchase_id, context=context)
-                if po_vals['origin'] and not po_vals['origin'] in purchase.origin:
+                origin = po_vals['origin']
+                if origin and origin not in purchase.origin:
                     po_vals['origin'] += ' %s' % purchase.origin
                 purchase.write(po_vals, context=context)
                 return purchase_id
         return super(purchase_order, self).create(
             cr, uid, po_vals, context=context)
-
-    def unlock(self, cr, uid, ids, context=None):
-        return self.write(cr, uid, ids, {"lock": False}, context=context)
-
-    def write(self, cr, uid, ids, vals, context=None):
-        if vals.get('order_line') and not (
-                context.get('update_from_procurement')
-                or not vals.get('lock')):
-            for po in self.browse(cr, uid, ids, context=context):
-                if po.lock:
-                    raise orm.except_orm(
-                        _("User Error"),
-                        _("You can not change the locked purchase order %s. "
-                            "Unlock it before changing data.") % po.name)
-        return super(purchase_order, self).write(
-            cr, uid, ids, vals, context=context)
 
 
 class purchase_order_line(orm.Model):
@@ -94,8 +65,8 @@ class purchase_order_line(orm.Model):
     def _get_po_line_matching_key(self, cr, uid, context=None):
         return ['product_id', 'product_uom']
 
-    def _get_existing_purchase_order_line(
-            self, cr, uid, po_line_vals, context=None):
+    def _get_existing_purchase_order_line(self, cr, uid, po_line_vals,
+                                          context=None):
         matching_key = self._get_po_line_matching_key(cr, uid, context=context)
         domain = [('state', '=', 'draft')]
         for key in matching_key:
@@ -128,43 +99,6 @@ class procurement_order(orm.Model):
         context['purchase_auto_merge'] = True
         return super(procurement_order, self).make_po(
             cr, uid, ids, context=context)
-
-    def _prepare_purchase_order(
-            self, cr, uid, procurement, seller_info, purchase_date,
-            context=None):
-        vals = super(procurement_order, self)._prepare_purchase_order(
-            cr, uid, procurement, seller_info, purchase_date, context=context)
-        vals['lock'] = True
-        return vals
-
-    def write(self, cr, uid, ids, vals, context=None):
-        uom_obj = self.pool['product.uom']
-        if 'product_qty' in vals:
-            if not hasattr(ids, '__iter__'):
-                proc_ids = [ids]
-            else:
-                proc_ids = ids
-            for procurement in self.browse(cr, uid, proc_ids, context=context):
-                if procurement.move_id and procurement.purchase_line_id:
-                    procurement.move_id.write(
-                        {'product_qty': vals['product_qty']}, context=context)
-                    qty = uom_obj._compute_qty(
-                        cr, uid, procurement.product_uom.id,
-                        vals['product_qty'],
-                        procurement.purchase_line_id.product_uom.id)
-                    procurement.purchase_line_id.write(
-                        {'product_qty': qty}, context=context)
-                    if not procurement.purchase_line_id.order_id.lock:
-                        raise orm.except_orm(
-                            _('User Error'),
-                            _('The procurement %s is linked to the purchase '
-                                'order %s and this purchase order is not '
-                                'unlocked. You can only update locked '
-                                'purchase orders.')
-                            % (procurement.name,
-                                procurement.purchase_line_id.order_id.name))
-        return super(procurement_order, self).write(
-            cr, uid, ids, vals, context=context)
 
     def _product_virtual_get(self, cr, uid, order_point):
         res = self.pool['stock.location']._product_virtual_get(
