@@ -1,0 +1,81 @@
+<?xml version="1.0" ?>
+<openerp>
+    <data>
+        <record id="supplier_1" model="res.partner">
+            <field name="name">supplier 1</field>
+            <field name="supplier">True</field>
+        </record>
+
+        <record id="supplier_2" model="res.partner">
+            <field name="name">supplier 2</field>
+            <field name="supplier">True</field>
+        </record>
+
+        <record id="product_1" model="product.product">
+            <field name="name">product 1</field>
+            <field name="type">product</field>
+            <field name="standard_price">10.0</field>
+        </record>
+
+        <record id="product_1_supplier1" model="product.supplierinfo">
+            <field name="product_id" ref="product_1" />
+            <field name="name" ref="supplier_1" />
+            <field name="min_qty">0.0</field>
+            <field name="delay">1</field>
+        </record>
+
+        <record id="product_1_orderpoint" model="stock.warehouse.orderpoint">
+            <field name="product_id" ref="product_1" />
+            <field name="product_uom" ref="product.product_uom_unit" />
+            <field name="product_min_qty">10.0</field>
+            <field name="product_max_qty">0.0</field>
+            <field name="qty_multiple">1</field>
+            <field name="active">True</field>
+        </record>
+
+        <record id="product_2" model="product.product">
+            <field name="name">product 2</field>
+            <field name="type">product</field>
+            <field name="standard_price">20.0</field>
+        </record>
+
+        <record id="product_2_supplier1" model="product.supplierinfo">
+            <field name="product_id" ref="product_2" />
+            <field name="name" ref="supplier_1" />
+            <field name="min_qty">0.0</field>
+            <field name="delay">1</field>
+        </record>
+
+        <record id="product_2_orderpoint" model="stock.warehouse.orderpoint">
+            <field name="product_id" ref="product_2" />
+            <field name="product_uom" ref="product.product_uom_unit" />
+            <field name="product_min_qty">10.0</field>
+            <field name="product_max_qty">0.0</field>
+            <field name="qty_multiple">1</field>
+            <field name="active">True</field>
+        </record>
+
+        <record id="product_3" model="product.product">
+            <field name="name">product 3</field>
+            <field name="type">product</field>
+            <field name="standard_price">30.0</field>
+        </record>
+
+        <record id="product_3_supplier2" model="product.supplierinfo">
+            <field name="product_id" ref="product_3" />
+            <field name="name" ref="supplier_2" />
+            <field name="min_qty">0.0</field>
+            <field name="delay">1</field>
+        </record>
+
+        <record id="product_3_orderpoint" model="stock.warehouse.orderpoint">
+            <field name="product_id" ref="product_3" />
+            <field name="product_uom" ref="product.product_uom_unit" />
+            <field name="product_min_qty">10.0</field>
+            <field name="product_max_qty">0.0</field>
+            <field name="qty_multiple">1</field>
+            <field name="active">True</field>
+        </record>
+    </data>
+</openerp>
+
