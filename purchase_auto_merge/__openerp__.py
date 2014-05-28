@@ -39,7 +39,9 @@ scheduler are added to existing draft purchase orders.
         'purchase',
         'procurement',
     ],
-    'data': [],
+    'data': [
+        'purchase_view.xml',
+    ],
     'demo': [
         'demo.xml',
     ],

@@ -20,11 +20,23 @@
 #
 ###############################################################################
 
-from openerp.osv import orm
+from openerp.osv import orm, fields
 
 
 class purchase_order(orm.Model):
     _inherit = "purchase.order"
+
+    _columns = {
+        'lock': fields.boolean(
+            'Lock', readonly=True,
+            help="An order generated automatically is locked by default "
+            "and you can not edit it until you unlock it. "
+            "An unlocked order is not updated automatically anymore."),
+    }
+
+    _defaults = {
+        'lock': False,
+    }
 
     def _get_po_matching_key(self, cr, uid, context=None):
         return [
@@ -36,7 +48,7 @@ class purchase_order(orm.Model):
 
     def _get_existing_purchase_order(self, cr, uid, po_vals, context=None):
         matching_key = self._get_po_matching_key(cr, uid, context=context)
-        domain = [('state', '=', 'draft')]
+        domain = [('state', '=', 'draft'), ('lock', '=', True)]
         for key in matching_key:
             domain.append((key, '=', po_vals.get(key) or False))
         po_ids = self.search(cr, uid, domain, context=context)
@@ -55,8 +67,12 @@ class purchase_order(orm.Model):
                     po_vals['origin'] += ' %s' % purchase.origin
                 purchase.write(po_vals, context=context)
                 return purchase_id
+            po_vals['lock'] = True
         return super(purchase_order, self).create(
             cr, uid, po_vals, context=context)
+
+    def unlock(self, cr, uid, ids, context=None):
+        return self.write(cr, uid, ids, {"lock": False}, context=context)
 
 
 class purchase_order_line(orm.Model):
@@ -68,13 +84,18 @@ class purchase_order_line(orm.Model):
     def _get_existing_purchase_order_line(self, cr, uid, po_line_vals,
                                           context=None):
         matching_key = self._get_po_line_matching_key(cr, uid, context=context)
-        domain = [('state', '=', 'draft')]
+        domain = [
+            ('order_id.state', '=', 'draft'),
+            ('order_id.lock', '=', True)
+        ]
         for key in matching_key:
             domain.append((key, '=', po_line_vals.get(key)))
         po_line_ids = self.search(cr, uid, domain, context=context)
         return po_line_ids and po_line_ids[0] or False
 
     def create(self, cr, uid, vals, context=None):
+        if context is None:
+            context = {}
         if context.get('purchase_auto_merge'):
             po_line_id = self._get_existing_purchase_order_line(
                 cr, uid, vals, context=context)
@@ -96,7 +117,8 @@ class procurement_order(orm.Model):
     def make_po(self, cr, uid, ids, context=None):
         if context is None:
             context = {}
-        context['purchase_auto_merge'] = True
+        if 'purchase_auto_merge' not in context:
+            context['purchase_auto_merge'] = True
         return super(procurement_order, self).make_po(
             cr, uid, ids, context=context)
 
