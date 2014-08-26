@@ -114,13 +114,27 @@ class purchase_order_line(orm.Model):
 class procurement_order(orm.Model):
     _inherit = 'procurement.order'
 
+    _columns = {
+        'purchase_auto_merge': fields.boolean(
+            'Purchase auto merge', readonly=True,
+            help="Tell if we should try to update an existing procurement or "
+            "create a new one"),
+    }
+
+    _defaults = {
+        'purchase_auto_merge': True,
+    }
+
     def make_po(self, cr, uid, ids, context=None):
         if context is None:
             context = {}
-        if 'purchase_auto_merge' not in context:
-            context['purchase_auto_merge'] = True
-        return super(procurement_order, self).make_po(
-            cr, uid, ids, context=context)
+        res = {}
+        for procurement in self.browse(cr, uid, ids, context=context):
+            context['purchase_auto_merge'] = procurement.purchase_auto_merge
+            res.update(super(procurement_order, self).make_po(
+                cr, uid, ids, context=context
+            ))
+        return res
 
     def _product_virtual_get(self, cr, uid, order_point):
         res = self.pool['stock.location']._product_virtual_get(
