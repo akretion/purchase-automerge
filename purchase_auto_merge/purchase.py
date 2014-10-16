@@ -74,9 +74,25 @@ class purchase_order(orm.Model):
     def unlock(self, cr, uid, ids, context=None):
         return self.write(cr, uid, ids, {"lock": False}, context=context)
 
+    def _create_pickings(self, cr, uid, order, order_lines,
+                         picking_id=False, context=None):
+        res = super(purchase_order, self)._create_pickings(
+            cr, uid, order, order_lines, picking_id=picking_id, context=context)
+        for order_line in order_lines:
+            for proc in order_line.procurement_ids:
+                if proc.move_id:
+                    proc.move_id.write({'location_id': order.location_id.id})
+        return res
 
 class purchase_order_line(orm.Model):
     _inherit = 'purchase.order.line'
+
+    _columns = {
+        'procurement_ids': fields.one2many(
+            'procurement.order', 'purchase_line_id', 'Procurements')
+        #'procurement_ids': fields.many2many(
+        #    'procurement.order', 'purchase_line_rel', 'line_id', 'proc_id', 'Procurements')
+    }
 
     def _get_po_line_matching_key(self, cr, uid, context=None):
         return ['product_id', 'product_uom']
@@ -91,7 +107,7 @@ class purchase_order_line(orm.Model):
         for key in matching_key:
             domain.append((key, '=', po_line_vals.get(key)))
         po_line_ids = self.search(cr, uid, domain, context=context)
-        return po_line_ids and po_line_ids[0] or False
+        return po_line_ids and po_line_ids[0] or False  
 
     def create(self, cr, uid, vals, context=None):
         if context is None:
@@ -99,17 +115,28 @@ class purchase_order_line(orm.Model):
         if context.get('purchase_auto_merge'):
             po_line_id = self._get_existing_purchase_order_line(
                 cr, uid, vals, context=context)
-            if po_line_id:
+            if po_line_id:                    
                 po_line = self.browse(
                     cr, uid, po_line_id, context=context)
                 added_qty = vals.get('product_qty')
                 if added_qty:
                     new_qty = po_line.product_qty + added_qty
                     po_line.write({'product_qty': new_qty}, context=context)
+                if vals.get('procurement_ids', False):
+                    #po_line.write({'procurement_ids': [(4, vals['procurement_ids'][0][2][0])]}, context=context)
+                    po_line.write({'procurement_ids': vals['procurement_ids']}, context=context)
                 return po_line_id
         return super(purchase_order_line, self).create(
             cr, uid, vals, context=context)
 
+    def unlink(self, cr, uid, ids, context=None):
+        procurement_ids_to_cancel = []
+        for line in self.browse(cr, uid, ids, context=context):
+            for proc in line.procurement_ids:
+                procurement_ids_to_cancel.append(proc.id)
+        if procurement_ids_to_cancel:
+            self.pool['procurement.order'].action_cancel(cr, uid, procurement_ids_to_cancel)
+        return super(purchase_order_line, self).unlink(cr, uid, ids, context=context)
 
 class procurement_order(orm.Model):
     _inherit = 'procurement.order'
@@ -119,11 +146,19 @@ class procurement_order(orm.Model):
             'Purchase auto merge', readonly=True,
             help="Tell if we should try to update an existing procurement or "
             "create a new one"),
+        'purchase_line_id': fields.many2one('purchase.order.line', 'Purchase Line'),
     }
 
     _defaults = {
         'purchase_auto_merge': True,
     }
+
+    def create_procurement_purchase_order(self, cr, uid, procurement, po_vals,
+                                          line_vals, context=None):
+        #line_vals.update({'procurement_ids': [(6, 0, [procurement.id])]})
+        line_vals.update({'procurement_ids': [(4, procurement.id)]})
+        return super(procurement_order, self).create_procurement_purchase_order(
+            cr, uid, procurement, po_vals, line_vals, context=context)
 
     def make_po(self, cr, uid, ids, context=None):
         if context is None:
