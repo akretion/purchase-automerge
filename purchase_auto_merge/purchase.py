@@ -63,7 +63,9 @@ class purchase_order(orm.Model):
             if purchase_id:
                 purchase = self.browse(cr, uid, purchase_id, context=context)
                 origin = po_vals['origin']
-                if origin and origin not in purchase.origin:
+                if not purchase.origin:
+                    pass
+                elif origin and origin not in purchase.origin:
                     po_vals['origin'] += ' %s' % purchase.origin
                 purchase.write(po_vals, context=context)
                 return purchase_id
