@@ -97,7 +97,7 @@ class purchase_order_line(orm.Model):
     }
 
     def _get_po_line_matching_key(self, cr, uid, context=None):
-        return ['product_id', 'product_uom']
+        return ['product_id', 'product_uom', 'order_id']
 
     def _get_existing_purchase_order_line(self, cr, uid, po_line_vals,
                                           context=None):
