@@ -67,6 +67,8 @@ class purchase_order(orm.Model):
                     pass
                 elif origin and origin not in purchase.origin:
                     po_vals['origin'] += ' %s' % purchase.origin
+                # Avoid to erase the initial date_order
+                po_vals.pop('date_order', None)
                 purchase.write(po_vals, context=context)
                 return purchase_id
             po_vals['lock'] = True
